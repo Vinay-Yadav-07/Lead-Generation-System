@@ -1,0 +1,8 @@
+phonenumbers
+beautifulsoup4
+ddgs
+fastapi
+python-dotenv
+requests
+sqlalchemy
+uvicorn

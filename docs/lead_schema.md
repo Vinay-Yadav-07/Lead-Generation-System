@@ -1,0 +1,21 @@
+{
+  "id": "",
+  "full_name": "",
+  "job_title": "",
+  "company_name": "",
+  "company_website": "",
+  "industry": "",
+  "employee_count": "",
+  "founding_year": "",
+  "linkedin_url": "",
+  "email": "",
+  "email_status": "",
+  "phone": "",
+  "phone_status": "",
+  "role_verified": false,
+  "confidence_score": 0,
+  "confidence_level": "",
+  "source": "",
+  "date_added": "",
+  "status": "New"
+}

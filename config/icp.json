@@ -1,0 +1,13 @@
+{
+  "job_titles": [
+    "CEO",
+    "Founder",
+    "Owner"
+  ],
+  "industry": "Logistics",
+  "country": "India",
+  "company_size": "10-500",
+  "employee_min": 1,
+  "employee_max": 1000,
+  "founding_year": 2005
+}

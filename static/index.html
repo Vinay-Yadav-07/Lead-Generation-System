@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AutoNova LeadGen</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="/static/app.js" defer></script>
+    <style>
+      .new-dashboard-banner {
+        background: linear-gradient(90deg, #2451f5, #1d2f8f);
+        color: white;
+        text-align: center;
+        padding: 8px 16px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .new-dashboard-banner a {
+        color: #93b4ff;
+        font-weight: 600;
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="new-dashboard-banner">
+      <span>AutoNova now features a premium React + Tailwind dashboard.</span>
+      <a href="/">Go to New Dashboard →</a>
+    </div>
+    <header class="topbar">
+      <div>
+        <h1>AutoNova LeadGen</h1>
+        <p id="last-refresh">Ready</p>
+      </div>
+      <div class="top-actions">
+        <button id="refresh-btn" class="icon-button" title="Refresh">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+        <a class="icon-button" href="/docs" title="API docs">
+          <i data-lucide="file-code-2"></i>
+        </a>
+        <a class="primary-button" href="/export/csv" title="Export CSV">
+          <i data-lucide="download"></i>
+          CSV
+        </a>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="stats-grid" aria-label="Pipeline stats">
+        <article class="metric">
+          <span>Companies</span>
+          <strong id="stat-companies">0</strong>
+          <small id="stat-company-detail">0 with websites</small>
+        </article>
+        <article class="metric">
+          <span>Leads</span>
+          <strong id="stat-leads">0</strong>
+          <small id="stat-lead-detail">0 with email</small>
+        </article>
+        <article class="metric">
+          <span>Verified Roles</span>
+          <strong id="stat-roles">0</strong>
+          <small id="stat-confidence">0 high confidence</small>
+        </article>
+        <article class="metric">
+          <span>Outreach</span>
+          <strong id="stat-outreach">0</strong>
+          <small id="stat-outreach-detail">0 sent</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <aside class="side-panel">
+          <section id="run-status-panel" class="panel run-status hidden">
+            <div class="panel-title">
+              <h2 id="run-title">Running</h2>
+              <span id="run-elapsed">0s</span>
+            </div>
+            <div class="progress-track">
+              <div id="run-progress" class="progress-bar"></div>
+            </div>
+            <p id="run-message"></p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>ICP</h2>
+              <button id="save-icp-btn" class="icon-button" title="Save ICP">
+                <i data-lucide="save"></i>
+              </button>
+            </div>
+            <label>
+              Industry
+              <input id="icp-industry" type="text" />
+            </label>
+            <label>
+              Geography
+              <input id="icp-country" type="text" />
+            </label>
+            <div class="split">
+              <label>
+                Min Employees
+                <input id="icp-min" type="number" min="0" />
+              </label>
+              <label>
+                Max Employees
+                <input id="icp-max" type="number" min="0" />
+              </label>
+            </div>
+            <label>
+              Job Titles
+              <textarea id="icp-titles" rows="4"></textarea>
+            </label>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>Pipeline</h2>
+            </div>
+            <div class="action-list">
+              <button data-action="discover-companies-db?replace=true">
+                <i data-lucide="database"></i>
+                Discover Companies
+              </button>
+              <button data-action="discover-websites">
+                <i data-lucide="globe"></i>
+                Discover Websites
+              </button>
+              <button data-action="score-companies">
+                <i data-lucide="gauge"></i>
+                Score Companies
+              </button>
+              <button data-action="generate-leads-from-companies?limit=30">
+                <i data-lucide="users"></i>
+                Generate Leads
+              </button>
+              <button data-action="verify-all">
+                <i data-lucide="badge-check"></i>
+                Verify Leads
+              </button>
+              <button data-action="campaign/send-approved">
+                <i data-lucide="send"></i>
+                Send Approved
+              </button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>Integrations</h2>
+            </div>
+            <div id="integration-status" class="integration-status"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h2>Activity</h2>
+            </div>
+            <div id="activity-log" class="activity-log"></div>
+          </section>
+        </aside>
+
+        <section class="main-panel">
+          <nav class="tabs" aria-label="Dashboard views">
+            <button class="tab active" data-tab="leads">Leads</button>
+            <button class="tab" data-tab="companies">Companies</button>
+            <button class="tab" data-tab="outreach">Outreach</button>
+          </nav>
+
+          <section id="leads-tab" class="tab-panel active">
+            <div class="table-toolbar">
+              <div class="search-wrap">
+                <i data-lucide="search"></i>
+                <input id="lead-search" type="search" placeholder="Search leads" />
+              </div>
+              <select id="status-filter" title="Status filter">
+                <option value="">All statuses</option>
+                <option>New</option>
+                <option>Reviewed</option>
+                <option>Approved for Outreach</option>
+                <option>Do Not Contact</option>
+                <option>Contacted</option>
+                <option>Replied</option>
+              </select>
+            </div>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Company</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Score</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="leads-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="companies-tab" class="tab-panel">
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Company</th>
+                    <th>Founder</th>
+                    <th>Founded</th>
+                    <th>Website</th>
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody id="companies-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="outreach-tab" class="tab-panel">
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Lead</th>
+                    <th>Status</th>
+                    <th>Subject</th>
+                    <th>Created</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody id="outreach-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="lead-dialog">
+      <form method="dialog" class="dialog-panel">
+        <header>
+          <div>
+            <h2 id="detail-name">Lead</h2>
+            <p id="detail-company"></p>
+          </div>
+          <button class="icon-button" title="Close">
+            <i data-lucide="x"></i>
+          </button>
+        </header>
+        <section class="detail-grid">
+          <div>
+            <span>Email</span>
+            <strong id="detail-email"></strong>
+            <small id="detail-email-status"></small>
+          </div>
+          <div>
+            <span>Phone</span>
+            <strong id="detail-phone"></strong>
+            <small id="detail-phone-status"></small>
+          </div>
+          <div>
+            <span>Confidence</span>
+            <strong id="detail-score"></strong>
+            <small id="detail-role"></small>
+          </div>
+          <div>
+            <span>Website</span>
+            <strong id="detail-website"></strong>
+            <small id="detail-linkedin"></small>
+          </div>
+        </section>
+        <section>
+          <div class="panel-title">
+            <h2>Email Draft</h2>
+            <div class="inline-actions">
+              <button id="approve-btn" type="button">
+                <i data-lucide="thumbs-up"></i>
+                Approve
+              </button>
+              <button id="send-btn" type="button">
+                <i data-lucide="send"></i>
+                Send
+              </button>
+            </div>
+          </div>
+          <input id="email-subject" type="text" readonly />
+          <textarea id="email-body" rows="9" readonly></textarea>
+        </section>
+        <section>
+          <h2>Evidence</h2>
+          <div id="evidence-list" class="evidence-list"></div>
+        </section>
+      </form>
+    </dialog>
+
+    <div id="toast" role="status"></div>
+  </body>
+</html>

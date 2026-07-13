@@ -15,9 +15,9 @@ const statuses = [
 ];
 
 const actionInfo = {
-  "discover-companies-db?replace=true": {
+  "discover-companies-db": {
     title: "Discovering companies",
-    estimate: "Usually 20-60 seconds. It searches the web using the saved ICP and replaces old company/lead data.",
+    estimate: "Usually 20-60 seconds. It searches the web using the saved ICP and appends new company/lead data.",
   },
   "discover-websites": {
     title: "Discovering websites",
@@ -240,7 +240,10 @@ function renderLeads() {
       <td>${lead.phone || ""}<br><small>${lead.phone_status || ""}</small></td>
       <td><span class="pill ${confidenceClass(level)}">${lead.confidence_score ?? 0} ${level}</span></td>
       <td>${statusSelect(lead)}</td>
-      <td><button class="icon-button" title="Open lead" data-open-lead="${lead.id}"><i data-lucide="panel-right-open"></i></button></td>
+      <td>
+        <button class="icon-button" title="Open lead" data-open-lead="${lead.id}"><i data-lucide="panel-right-open"></i></button>
+        <button class="icon-button delete-btn" title="Delete lead" data-delete-lead="${lead.id}"><i data-lucide="trash-2"></i></button>
+      </td>
     `;
     body.appendChild(tr);
   }
@@ -376,9 +379,57 @@ function bindEvents() {
     });
   });
 
-  document.body.addEventListener("click", (event) => {
+  document.body.addEventListener("click", async (event) => {
     const openButton = event.target.closest("[data-open-lead]");
     if (openButton) openLead(Number(openButton.dataset.openLead));
+
+    const deleteButton = event.target.closest("[data-delete-lead]");
+    if (deleteButton) {
+      const id = Number(deleteButton.dataset.deleteLead);
+      if (confirm("Delete this lead? This cannot be undone.")) {
+        try {
+          await api(`/api/leads/${id}`, { method: "DELETE" });
+          toast("Lead deleted");
+          addActivity(`Deleted lead ID ${id}`);
+          await refreshAll();
+        } catch (err) {
+          toast("Failed to delete lead");
+          console.error(err);
+        }
+      }
+    }
+  });
+
+  $("#delete-filtered-btn").addEventListener("click", async () => {
+    const status = $("#status-filter").value;
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+
+    try {
+      const matchingLeads = await api(`/api/leads?${params.toString()}`);
+      const count = matchingLeads.length;
+
+      if (count === 0) {
+        alert("No leads match the current filters. Nothing to delete.");
+        return;
+      }
+
+      let deleteUrl = `/api/leads?${params.toString()}`;
+      if (!status) {
+        deleteUrl += (deleteUrl.includes("?") ? "&" : "?") + "confirm=true";
+      }
+
+      const filterDesc = status ? `status "${status}"` : "all statuses";
+      if (confirm(`Are you sure you want to delete all ${count} leads matching ${filterDesc}? This cannot be undone.`)) {
+        const result = await api(deleteUrl, { method: "DELETE" });
+        toast(`${result.count} leads deleted`);
+        addActivity(`Bulk deleted ${result.count} leads`);
+        await refreshAll();
+      }
+    } catch (err) {
+      toast("Failed to perform bulk delete");
+      console.error(err);
+    }
   });
 
   document.body.addEventListener("change", (event) => {

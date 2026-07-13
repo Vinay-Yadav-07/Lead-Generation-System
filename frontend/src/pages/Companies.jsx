@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getCompanies } from '../api'
+import { getCompanies, deleteCompany, deleteCompanies } from '../api'
 
 export default function Companies() {
   const [companies, setCompanies] = useState([])
@@ -22,6 +22,48 @@ export default function Companies() {
     fetchCompanies()
   }, [])
 
+  const handleDeleteCompany = async (companyId) => {
+    if (window.confirm("Delete this company and all its associated leads? This cannot be undone.")) {
+      try {
+        await deleteCompany(companyId)
+        setCompanies(prev => prev.filter(c => c.id !== companyId))
+        if (selectedCompany && selectedCompany.id === companyId) {
+          setSelectedCompany(null)
+        }
+      } catch (e) {
+        alert("Failed to delete company")
+      }
+    }
+  }
+
+  const handleDeleteFiltered = async () => {
+    const count = filteredCompanies.length
+    if (count === 0) {
+      alert("No companies match the current search filters. Nothing to delete.")
+      return
+    }
+    const term = search.trim()
+    const filterDesc = term ? `search term "${term}"` : "all"
+    
+    if (window.confirm(`Are you sure you want to delete all ${count} companies matching ${filterDesc}? This cannot be undone.`)) {
+      try {
+        const params = {}
+        if (term) {
+          params.industry = term
+        } else {
+          params.confirm = true
+        }
+        await deleteCompanies(params)
+        await fetchCompanies()
+        alert(`Successfully deleted companies.`)
+      } catch (e) {
+        alert("Failed to perform bulk delete")
+      }
+    }
+  }
+
+
+
   const filteredCompanies = companies.filter(c => {
     const term = search.toLowerCase()
     return (
@@ -41,9 +83,18 @@ export default function Companies() {
             {filteredCompanies.length} compan{filteredCompanies.length !== 1 ? 'ies' : 'y'} matching criteria
           </p>
         </div>
-        <button onClick={fetchCompanies} className="btn-secondary text-xs">
-          🔄 Refresh List
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={fetchCompanies} className="btn-secondary text-xs">
+            🔄 Refresh List
+          </button>
+          <button
+            id="delete-filtered-companies-btn"
+            onClick={handleDeleteFiltered}
+            className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 active:bg-red-700 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+          >
+            🗑️ Delete Filtered
+          </button>
+        </div>
       </div>
 
       {/* Search Input */}
@@ -121,12 +172,22 @@ export default function Companies() {
                           {hasWebsite ? 'Website Found' : 'Discovered'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                       <td className="px-6 py-4 flex items-center gap-3">
                         <button
                           onClick={() => setSelectedCompany(c)}
                           className="btn-secondary text-xs py-1 px-3"
                         >
                           👁️ View
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCompany(c.id);
+                          }}
+                          className="text-red-500 hover:text-red-400 font-medium text-xs ml-2"
+                          title="Delete company"
+                        >
+                          🗑️
                         </button>
                       </td>
                     </tr>

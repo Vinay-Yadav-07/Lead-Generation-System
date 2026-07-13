@@ -15,4 +15,7 @@ class OutreachLog(Base):
     body = Column(String)
     status = Column(String, default="Drafted")
     provider_message = Column(String)
+    template_variant = Column(String, nullable=True)
+    model_used = Column(String, nullable=True)
+    tokens_used = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

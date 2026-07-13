@@ -82,6 +82,10 @@ def ensure_sqlite_columns():
             "founding_year": "INTEGER",
             "source_url": "VARCHAR",
             "scraped_date": "DATETIME",
+            "timezone": "VARCHAR",
+            "timezone_source": "VARCHAR",
+            "next_follow_up_at": "DATETIME",
+            "follow_up_step": "INTEGER DEFAULT 0",
         }
         for column, col_type in lead_additions.items():
             if column not in existing_leads:
@@ -101,6 +105,20 @@ def ensure_sqlite_columns():
         for column, col_type in company_additions.items():
             if column not in existing_companies:
                 conn.execute(text(f"ALTER TABLE companies ADD COLUMN {column} {col_type}"))
+
+        # --- outreach_logs table ---
+        existing_outreach = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(outreach_logs)")).fetchall()
+        }
+        outreach_additions = {
+            "template_variant": "VARCHAR",
+            "model_used": "VARCHAR",
+            "tokens_used": "INTEGER",
+        }
+        for column, col_type in outreach_additions.items():
+            if column not in existing_outreach:
+                conn.execute(text(f"ALTER TABLE outreach_logs ADD COLUMN {column} {col_type}"))
 
 
 ensure_sqlite_columns()
@@ -161,6 +179,11 @@ def serialize_lead(lead: Lead) -> dict:
         "source": lead.source,
         "status": lead.status,
 
+        "timezone": lead.timezone,
+        "timezone_source": lead.timezone_source,
+        "next_follow_up_at": lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
+        "follow_up_step": lead.follow_up_step,
+
         "created_at": lead.created_at.isoformat() if lead.created_at else None,
         "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
     }
@@ -175,6 +198,9 @@ def serialize_outreach_log(log: OutreachLog) -> dict:
         "body": log.body,
         "status": log.status,
         "provider_message": log.provider_message,
+        "template_variant": log.template_variant,
+        "model_used": log.model_used,
+        "tokens_used": log.tokens_used,
         "created_at": log.created_at.isoformat() if log.created_at else None,
     }
 
@@ -301,6 +327,153 @@ def api_get_lead(
         ],
         "audit_trail": [serialize_outreach_log(log) for log in outreach],
     }
+
+
+@app.delete("/api/leads/{lead_id}")
+def api_delete_lead(lead_id: int, db: Session = Depends(get_db)):
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    # Delete associated outreach logs and evidence
+    db.query(OutreachLog).filter(OutreachLog.lead_id == lead_id).delete(synchronize_session=False)
+    db.query(Evidence).filter(Evidence.lead_id == lead_id).delete(synchronize_session=False)
+    
+    db.delete(lead)
+    db.commit()
+    return {"message": "Lead deleted successfully", "id": lead_id}
+
+
+@app.delete("/leads/{lead_id}")
+def api_delete_lead_legacy(lead_id: int, db: Session = Depends(get_db)):
+    return api_delete_lead(lead_id=lead_id, db=db)
+
+
+@app.delete("/api/companies/{company_id}")
+def api_delete_company(company_id: int, db: Session = Depends(get_db)):
+    company = db.query(Company).filter(Company.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    if company.company_name:
+        db.query(Lead).filter(Lead.company_name == company.company_name).delete(synchronize_session=False)
+        
+    db.delete(company)
+    db.commit()
+    return {"message": "Company and associated leads deleted successfully", "id": company_id}
+
+
+@app.delete("/companies/{company_id}")
+def api_delete_company_legacy(company_id: int, db: Session = Depends(get_db)):
+    return api_delete_company(company_id=company_id, db=db)
+
+
+@app.delete("/api/companies")
+def api_delete_companies(
+    industry: str = Query(None),
+    country: str = Query(None),
+    confirm: bool = Query(False),
+    db: Session = Depends(get_db)
+):
+    if industry is None and country is None:
+        if not confirm:
+            raise HTTPException(
+                status_code=400,
+                detail="Bulk delete of all companies requires 'confirm=true' query parameter."
+            )
+            
+    query = db.query(Company)
+    
+    if industry:
+        query = query.filter(Company.industry.ilike(f"%{industry}%"))
+    if country:
+        query = query.filter(Company.country.ilike(f"%{country}%"))
+        
+    companies_to_delete = query.all()
+    count = len(companies_to_delete)
+    
+    if count > 0:
+        company_names = [c.company_name for c in companies_to_delete if c.company_name]
+        # Delete associated leads
+        if company_names:
+            db.query(Lead).filter(Lead.company_name.in_(company_names)).delete(synchronize_session=False)
+            
+        # Delete the companies
+        for c in companies_to_delete:
+            db.delete(c)
+            
+        db.commit()
+        
+    return {"message": f"Successfully deleted {count} companies.", "count": count}
+
+
+@app.delete("/companies")
+def api_delete_companies_legacy(
+    industry: str = Query(None),
+    country: str = Query(None),
+    confirm: bool = Query(False),
+    db: Session = Depends(get_db)
+):
+    return api_delete_companies(industry=industry, country=country, confirm=confirm, db=db)
+
+
+
+
+@app.delete("/api/leads")
+def api_delete_leads(
+    status: str = Query(None),
+    industry: str = Query(None),
+    older_than_days: int = Query(None),
+    confirm: bool = Query(False),
+    db: Session = Depends(get_db)
+):
+    if status is None and industry is None and older_than_days is None:
+        if not confirm:
+            raise HTTPException(
+                status_code=400,
+                detail="No filters provided. You must pass confirm=true to delete all leads."
+            )
+            
+    q = db.query(Lead)
+    if status is not None:
+        q = q.filter(Lead.status == status)
+    if industry is not None:
+        q = q.filter(Lead.industry.ilike(f"%{industry}%"))
+    if older_than_days is not None:
+        from datetime import datetime, timedelta
+        cutoff = datetime.utcnow() - timedelta(days=older_than_days)
+        q = q.filter(Lead.created_at < cutoff)
+        
+    leads_to_delete = q.all()
+    lead_ids = [lead.id for lead in leads_to_delete]
+    
+    if not lead_ids:
+        return {"message": "No leads matched the filters. Nothing deleted.", "count": 0}
+        
+    # Delete associated outreach logs and evidence
+    db.query(OutreachLog).filter(OutreachLog.lead_id.in_(lead_ids)).delete(synchronize_session=False)
+    db.query(Evidence).filter(Evidence.lead_id.in_(lead_ids)).delete(synchronize_session=False)
+    
+    # Delete the leads
+    db.query(Lead).filter(Lead.id.in_(lead_ids)).delete(synchronize_session=False)
+    db.commit()
+    
+    return {
+        "message": f"Successfully deleted {len(lead_ids)} leads.",
+        "count": len(lead_ids),
+        "deleted_ids": lead_ids
+    }
+
+
+@app.delete("/leads")
+def api_delete_leads_legacy(
+    status: str = Query(None),
+    industry: str = Query(None),
+    older_than_days: int = Query(None),
+    confirm: bool = Query(False),
+    db: Session = Depends(get_db)
+):
+    return api_delete_leads(status=status, industry=industry, older_than_days=older_than_days, confirm=confirm, db=db)
 
 
 @app.put("/api/leads/{lead_id}/status")
@@ -653,8 +826,8 @@ def import_inc42(db: Session = Depends(get_db)):
 
 
 @app.post("/api/discover-companies-db")
-def discover_companies_db(replace: bool = True, db: Session = Depends(get_db)):
-    return discover_and_save_icp_companies(db, replace=replace)
+def discover_companies_db(db: Session = Depends(get_db)):
+    return discover_and_save_icp_companies(db, replace=False)
 
 
 @app.get("/api/companies-db")
@@ -857,32 +1030,19 @@ def send_lead_email(lead_id: int, db: Session = Depends(get_db)):
             detail=f"Lead is already marked '{lead.status}'. Change status before sending again.",
         )
 
-    draft = generate_cold_email(lead)
-    try:
-        result = send_email_or_simulate(
-            to_email=lead.email,
-            subject=draft["subject"],
-            body=draft["body"],
-        )
-    except Exception as exc:
-        result = {"status": "Failed", "provider_message": str(exc)}
-
-    log = OutreachLog(
-        lead_id=lead.id,
-        channel="email",
-        subject=draft["subject"],
-        body=draft["body"],
-        status=result["status"],
-        provider_message=result["provider_message"],
-    )
-    db.add(log)
-
-    if result["status"] in {"Sent", "Simulated"}:
-        lead.status = "Contacted"
+    from services.outreach import process_send
+    result, log = process_send(lead, db, is_follow_up=False)
 
     db.commit()
     db.refresh(log)
     db.refresh(lead)
+
+    if result.get("status") == "Skipped":
+        return {
+            "message": "Daily send cap reached. Outreach skipped.",
+            "lead": serialize_lead(lead),
+            "outreach": serialize_outreach_log(log),
+        }
 
     return {
         "message": "Outreach processed.",
@@ -898,30 +1058,9 @@ def send_approved_campaign(db: Session = Depends(get_db)):
     )
     results = []
 
+    from services.outreach import process_send
     for lead in leads:
-        draft = generate_cold_email(lead)
-        try:
-            result = send_email_or_simulate(
-                to_email=lead.email,
-                subject=draft["subject"],
-                body=draft["body"],
-            )
-        except Exception as exc:
-            result = {"status": "Failed", "provider_message": str(exc)}
-
-        log = OutreachLog(
-            lead_id=lead.id,
-            channel="email",
-            subject=draft["subject"],
-            body=draft["body"],
-            status=result["status"],
-            provider_message=result["provider_message"],
-        )
-        db.add(log)
-
-        if result["status"] in {"Sent", "Simulated"}:
-            lead.status = "Contacted"
-
+        result, log = process_send(lead, db, is_follow_up=False)
         results.append(
             {
                 "lead_id": lead.id,
@@ -930,6 +1069,8 @@ def send_approved_campaign(db: Session = Depends(get_db)):
                 **result,
             }
         )
+        if result.get("status") == "Skipped":
+            break
 
     db.commit()
     return {"message": "Campaign processed.", "processed": len(results), "results": results}
@@ -1007,6 +1148,49 @@ def send_approved_campaign_legacy(db: Session = Depends(get_db)):
 @app.get("/outreach-logs")
 def outreach_logs_legacy(db: Session = Depends(get_db)):
     return outreach_logs(db=db)
+
+
+# ---------------------------------------------------------------------------
+# Rate limit & cap control
+# ---------------------------------------------------------------------------
+from pydantic import BaseModel
+from services.send_scheduler import load_send_state, save_send_state
+
+class SendStateCapUpdate(BaseModel):
+    daily_cap: int
+
+@app.get("/api/send-state")
+def get_send_state():
+    return load_send_state()
+
+@app.post("/api/send-state/cap")
+def update_send_state_cap(payload: SendStateCapUpdate):
+    state = load_send_state()
+    state["daily_cap"] = payload.daily_cap
+    save_send_state(state)
+    return state
+
+
+# ---------------------------------------------------------------------------
+# Scheduler Startup
+# ---------------------------------------------------------------------------
+from apscheduler.schedulers.background import BackgroundScheduler
+from services.send_scheduler import run_scheduled_sends
+from database.db import SessionLocal
+
+scheduler = BackgroundScheduler()
+
+@app.on_event("startup")
+def start_scheduler():
+    scheduler.add_job(
+        run_scheduled_sends,
+        "interval",
+        minutes=15,
+        args=[SessionLocal],
+        id="scheduled_sends_job",
+        replace_existing=True
+    )
+    scheduler.start()
 
 
 @app.get("/{path_name:path}")

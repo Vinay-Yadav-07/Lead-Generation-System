@@ -1,0 +1,23 @@
+{
+  "variants": [
+    {
+      "id": "variant_1",
+      "hook": "Direct value prop — automation angle",
+      "subject_template": "Automate repetitive tasks at {company_name}",
+      "body_template": "Hi {first_name},\n\nI noticed {company_name} while researching {industry} businesses. AutoNova is a done-for-you service that automates repetitive sales and operations work for business owners.\n\nWe set up custom integrations that automatically handle your customer leads, trigger instant follow-ups, and sync your systems, removing hours of manual admin overhead every week.\n\nWould you be open to a quick 15-minute conversation next week to see how we could free up your time?\n\nBest,\nAutoNova Team"
+    },
+    {
+      "id": "variant_2",
+      "hook": "Curiosity / question opener",
+      "subject_template": "Quick question about lead follow-ups at {company_name}",
+      "body_template": "Hi {first_name},\n\nHow does your team at {company_name} currently handle new customer inquiries and follow-ups in the {industry} space? If it is done manually, you might be losing valuable leads in the shuffle.\n\nAutoNova provides a done-for-you service that automates your repetitive lead handling and customer follow-up workflows so nothing gets missed.\n\nWould you be free for a brief 15-minute chat next Tuesday to explore how this works?\n\nBest,\nAutoNova Team"
+    },
+    {
+      "id": "variant_3",
+      "hook": "Social proof angle",
+      "subject_template": "How other {industry} businesses are automating operations",
+      "body_template": "Hi {first_name},\n\nMany small businesses we work with were spending hours daily on manual data entry, customer follow-ups, and lead routing. We helped them automate these exact workflows, saving over 10 hours of admin work each week.\n\nAutoNova is a done-for-you automation service designed to take this repetitive operations load off your plate at {company_name}.\n\nWould you be open to a quick 15-minute call next week to see how other businesses in the {industry} space are using this?\n\nBest,\nAutoNova Team"
+    }
+  ],
+  "active_static_variant": "variant_1"
+}

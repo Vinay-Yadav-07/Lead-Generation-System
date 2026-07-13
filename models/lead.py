@@ -43,5 +43,10 @@ class Lead(Base):
 
     status = Column(String, default="New")
 
+    timezone = Column(String, nullable=True)          # e.g. "America/Chicago"
+    timezone_source = Column(String, nullable=True)   # "inferred" or "default"
+    next_follow_up_at = Column(DateTime, nullable=True)
+    follow_up_step = Column(Integer, default=0)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # NEW

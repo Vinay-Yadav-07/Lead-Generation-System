@@ -6,3 +6,6 @@ python-dotenv
 requests
 sqlalchemy
 uvicorn
+openai
+apscheduler
+

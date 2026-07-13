@@ -1,13 +1,13 @@
 {
   "job_titles": [
-    "CEO",
+    "Owner",
     "Founder",
-    "Owner"
+    "CEO"
   ],
-  "industry": "Logistics",
-  "country": "India",
-  "company_size": "10-500",
+  "industry": "jewelry",
+  "country": "United States",
+  "company_size": "1-100",
   "employee_min": 1,
-  "employee_max": 1000,
-  "founding_year": 2005
+  "employee_max": 100,
+  "founding_year": 2000
 }

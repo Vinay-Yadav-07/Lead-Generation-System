@@ -174,11 +174,23 @@ def discover_website(company_name: str) -> str | None:
 
     logger.info("[website_discovery] Searching website for: '%s'", company_name)
 
+    try:
+        from services.icp_loader import load_icp
+        icp = load_icp()
+        geography = icp.get("country", "").strip() or "India"
+        industry = icp.get("industry", "").strip() or "logistics startup"
+    except Exception as e:
+        logger.warning("[website_discovery] Failed to load ICP: %s. Using fallbacks.", e)
+        geography = "India"
+        industry = "logistics startup"
+
     queries = [
         f"{company_name} official website",
-        f"{company_name} India logistics startup",
-        f"{company_name} India company site",
+        f"{company_name} {geography} {industry}",
+        f"{company_name} {geography} company site",
     ]
+
+    logger.info("[website_discovery] Queries to try for '%s': %s", company_name, queries)
 
     for i, query in enumerate(queries):
         if i > 0:
@@ -198,7 +210,7 @@ def discover_website(company_name: str) -> str | None:
 
         if selected:
             logger.info(
-                "[website_discovery] '%s' → %s (via query: '%s')",
+                "[website_discovery] '%s' -> %s (via query: '%s')",
                 company_name, selected, query,
             )
             return selected
@@ -209,6 +221,6 @@ def discover_website(company_name: str) -> str | None:
         )
 
     logger.warning(
-        "[website_discovery] '%s' → no usable result after all queries.", company_name
+        "[website_discovery] '%s' -> no usable result after all queries.", company_name
     )
     return None

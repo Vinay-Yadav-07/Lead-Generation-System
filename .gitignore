@@ -32,3 +32,7 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local Pipeline State
+send_state.json
+

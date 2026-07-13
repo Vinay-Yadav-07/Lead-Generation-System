@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { getLeads, updateLeadStatus } from '../api'
+import { getLeads, updateLeadStatus, deleteLead, deleteLeads } from '../api'
 
 const CONFIDENCE_BADGE = {
   HIGH: 'badge-high',
@@ -52,6 +52,39 @@ export default function LeadList() {
     setStatusUpdating(null)
   }
 
+  const handleDeleteLead = async (leadId) => {
+    if (window.confirm("Delete this lead? This cannot be undone.")) {
+      try {
+        await deleteLead(leadId)
+        setLeads(prev => prev.filter(l => l.id !== leadId))
+      } catch (e) {
+        alert("Failed to delete lead")
+      }
+    }
+  }
+
+  const handleDeleteFiltered = async () => {
+    const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
+    const count = leads.length
+    if (count === 0) {
+      alert("No leads match the current filters. Nothing to delete.")
+      return
+    }
+    const filterDesc = Object.entries(params)
+      .map(([k, v]) => `${k}="${v}"`)
+      .join(", ") || "all"
+    
+    if (window.confirm(`Are you sure you want to delete all ${count} leads matching ${filterDesc}? This cannot be undone.`)) {
+      try {
+        await deleteLeads({ ...params, confirm: true })
+        setLeads([])
+        alert(`Successfully deleted ${count} leads.`)
+      } catch (e) {
+        alert("Failed to perform bulk delete")
+      }
+    }
+  }
+
   const setFilter = (key, val) => setFilters(prev => ({ ...prev, [key]: val }))
 
   return (
@@ -62,6 +95,13 @@ export default function LeadList() {
           <h1 className="text-2xl font-bold text-white">Lead List</h1>
           <p className="text-sm text-slate-400 mt-1">{leads.length} lead{leads.length !== 1 ? 's' : ''} found</p>
         </div>
+        <button
+          id="delete-filtered-btn"
+          onClick={handleDeleteFiltered}
+          className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 active:bg-red-700 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+        >
+          🗑️ Delete Filtered
+        </button>
       </div>
 
       {/* Filters — 5 required: Industry, Country (search), Status, Confidence, Search */}
@@ -220,13 +260,23 @@ export default function LeadList() {
                         </select>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center gap-3">
                       <Link
                         to={`/leads/${lead.id}`}
                         className="text-brand-400 hover:text-brand-300 text-xs font-medium hover:underline"
                       >
                         View →
                       </Link>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteLead(lead.id);
+                        }}
+                        className="text-red-500 hover:text-red-400 font-medium text-xs ml-2"
+                        title="Delete lead"
+                      >
+                        🗑️
+                      </button>
                     </td>
                   </tr>
                 ))

@@ -504,3 +504,27 @@ dialog::backdrop {
     justify-content: flex-end;
   }
 }
+
+.danger-btn {
+  background: var(--bad);
+  color: #ffffff;
+  border-color: var(--bad);
+}
+.danger-btn:hover {
+  background: #a01a14;
+  border-color: #a01a14;
+  color: #ffffff;
+}
+
+.icon-button.delete-btn {
+  color: var(--bad);
+  border: none;
+  background: transparent;
+  padding: 4px;
+  min-height: unset;
+}
+.icon-button.delete-btn:hover {
+  background: #fdebea;
+  transform: scale(1.05);
+}
+
